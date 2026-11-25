@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>くばるAI 配分窓口 — ライブ</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --ink: #1a1a1a; --sub: #5f5f5f; --line: #e4e4e0;
+    --accent: #2a78d6; --crit: #d03b3b; --good: #1baf7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161616; --card: #1f1f1f; --ink: #f0f0f0; --sub: #a8a8a8; --line: #333; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lead { color: var(--sub); font-size: 14px; margin: 0 0 16px; line-height: 1.6; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi .v { font-size: 26px; font-weight: 700; }
+  .kpi .l { font-size: 12px; color: var(--sub); }
+  .ok { color: var(--good); }
+  .ng { color: var(--crit); }
+  .mcp { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: var(--bg);
+         border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; flex: 1; min-width: 220px; }
+  button { font: inherit; font-size: 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+           color: var(--ink); padding: 8px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .tabs button { padding: 6px 12px; }
+  .tabs button.on { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  .heat { overflow-x: auto; }
+  table.grid { border-collapse: separate; border-spacing: 2px; width: 100%; min-width: 560px; }
+  .grid th { font-size: 12px; font-weight: 600; color: var(--sub); padding: 4px; text-align: center; }
+  .grid th.area { text-align: left; white-space: nowrap; color: var(--ink); }
+  .grid td { height: 44px; border-radius: 6px; text-align: center; font-size: 13px; transition: background .4s; position: relative; }
+  .grid td small { display: block; font-size: 10.5px; opacity: .85; }
+  .grid td.closed { background: transparent; color: var(--sub); border: 1px dashed var(--line); }
+  .grid td.over { outline: 2.5px solid var(--crit); outline-offset: -2px; font-weight: 700; }
+  .grid td.flash { box-shadow: 0 0 0 3px #f5b400 inset; }
+  .legend { font-size: 12px; color: var(--sub); margin-top: 8px; }
+  .feed { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+  .feed li { border-bottom: 1px solid var(--line); padding: 8px 0; font-size: 13px; line-height: 1.5; }
+  .feed .meta { color: var(--sub); font-size: 12px; }
+  .tag { display: inline-block; font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; margin-left: 4px; }
+  textarea { width: 100%; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: 8px;
+             padding: 10px; background: var(--bg); color: var(--ink); min-height: 64px; }
+  .plan li { margin: 6px 0; font-size: 14px; }
+  .plan .why { color: var(--sub); font-size: 12px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .two { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
+  .two > * { min-width: 0; }
+  @media (max-width: 820px) { .two { grid-template-columns: 1fr; } }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding-bottom: 2px; }
+  .tabs button { flex: none; }
+  @media (max-width: 640px) { .grid th.area { font-size: 11px; white-space: normal; min-width: 72px; } }
+  .note { font-size: 12px; color: var(--sub); }
+</style>
+</head>
+<body>
+<main>
+  <h1>くばるAI 配分窓口 — ライブ</h1>
+  <p class="lead">AIエージェントがこの窓口に旅程を頼むと、住民と決めた上限を超えないように1件ずつ枠を配ります。
+    この画面は2秒ごとに自動で更新されます。数値はデモ用の仮の値です。</p>
+
+  <div class="card">
+    <div class="row">
+      <div class="mcp" id="mcpUrl">…</div>
+      <button id="copyBtn">URLをコピー</button>
+    </div>
+    <p class="note" style="margin:8px 0 0">このURLを Claude の「設定 → コネクタ → カスタムコネクタを追加」に貼ると、そのClaudeがこの窓口を使えるようになります。
+      <span id="aiStatus"></span></p>
+  </div>
+
+  <div class="kpis">
+    <div class="card kpi"><div class="v" id="kBookings">0</div><div class="l">配っている体験(件)</div></div>
+    <div class="card kpi"><div class="v" id="kPeople">0</div><div class="l">送る人数(延べ)</div></div>
+    <div class="card kpi"><div class="v" id="kAgents">0</div><div class="l">つないだAIエージェント</div></div>
+    <div class="card kpi"><div class="v" id="kOver">0</div><div class="l">上限を超えたコマ</div></div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h2 style="margin:0">エリア×時間帯の混み具合</h2>
+        <div class="row tabs" id="dayTabs"></div>
+      </div>
+      <div class="heat"><table class="grid" id="grid"></table></div>
+      <div class="legend">色が濃いほど上限に近い(ふだんの人出の予測+窓口が送った人数 ÷ 上限)。
+        ▲と赤い枠は上限超え。黄色い枠は今配られたばかりのコマ。「休」は受け入れなし。</div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="rushBtn">AIエージェントを20人流す</button>
+        <button id="resetBtn">リセット</button>
+        <span class="note" id="rushNote"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>届いた予約(新しい順)</h2>
+      <ul class="feed" id="feed"><li class="meta">まだ予約はありません</li></ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>ここから頼んでみる</h2>
+    <textarea id="tryText">海鮮が好き。人混みは苦手で、静かに過ごしたい。</textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" id="tryBtn">旅程を配ってもらう</button>
+      <span class="note">1〜2日目・1人で頼みます(15分の仮押さえ)</span>
+    </div>
+    <div id="tryOut"></div>
+  </div>
+</main>
+
+<script>
+const BLUE = ["#cde2fb","#b7d3f6","#9ec5f4","#86b6ef","#6da7ec","#5598e7","#3987e5","#2a78d6","#256abf","#1c5cab","#184f95","#104281","#0d366b"];
+let day = 1, prev = {}, firstLoad = true;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const mcpUrl = location.origin + "/mcp";
+$("mcpUrl").textContent = mcpUrl;
+$("copyBtn").onclick = async () => {
+  try { await navigator.clipboard.writeText(mcpUrl); $("copyBtn").textContent = "コピーしました"; }
+  catch (e) { $("copyBtn").textContent = "長押しでコピー"; }
+  setTimeout(() => $("copyBtn").textContent = "URLをコピー", 1500);
+};
+
+function color(r) { return BLUE[Math.max(0, Math.min(BLUE.length - 1, Math.round(Math.min(r, 1) * (BLUE.length - 1))))]; }
+
+function render(s) {
+  $("kBookings").textContent = s.kpi.bookings;
+  $("kPeople").textContent = s.kpi.people;
+  $("kAgents").textContent = s.kpi.agents;
+  $("kOver").textContent = s.kpi.over;
+  $("kOver").className = "v " + (s.kpi.over ? "ng" : "ok");
+  $("aiStatus").textContent = s.ai.enabled ? `希望文の読み取り: AI(${s.ai.model})` : "希望文の読み取り: ルール(APIキー未設定)";
+
+  if (!$("dayTabs").children.length) {
+    s.days.forEach(d => {
+      const b = document.createElement("button");
+      b.textContent = d.id + "日目"; b.dataset.day = d.id;
+      b.onclick = () => { day = d.id; prev = {}; firstLoad = true; load(); };
+      $("dayTabs").appendChild(b);
+    });
+  }
+  [...$("dayTabs").children].forEach(b => b.classList.toggle("on", +b.dataset.day === day));
+
+  const by = {};
+  s.cells.forEach(c => by[c.area + "|" + c.slot] = c);
+  let h = "<tr><th></th>" + s.slots.map(x => `<th>${esc(x.name)}</th>`).join("") + "</tr>";
+  s.areas.forEach(a => {
+    h += `<tr><th class="area">${esc(a)}</th>`;
+    s.slots.forEach(x => {
+      const c = by[a + "|" + x.id], key = a + "|" + x.id;
+      if (!c || c.closed) { h += `<td class="closed">休</td>`; return; }
+      const over = c.ratio > 1.0000001, pct = Math.round(c.ratio * 100);
+      const changed = !firstLoad && prev[key] !== undefined && prev[key] !== c.sent;
+      prev[key] = c.sent;
+      const fg = Math.min(c.ratio, 1) > 0.5 ? "#fff" : "#0b0b0b";
+      h += `<td class="${over ? "over" : ""} ${changed ? "flash" : ""}" style="background:${color(c.ratio)};color:${fg}"
+              title="${esc(a)} ${esc(x.name)} 上限${c.cap}人 / 窓口が送った${c.sent}人">${over ? "▲" : ""}${pct}%<small>残り${c.remaining}</small></td>`;
+    });
+    h += "</tr>";
+  });
+  $("grid").innerHTML = h;
+  firstLoad = false;
+
+  $("feed").innerHTML = s.feed.length ? s.feed.map(f =>
+    `<li><b>${esc(f.name)}</b><span class="tag">${esc(f.kind)}</span><span class="tag">${esc(f.status)}</span><br>
+     <span class="meta">${esc(f.t)} · ${esc(f.agent)} · ${f.day}日目 ${esc(f.slot)} · ${esc(f.area)} · ${f.party}人</span></li>`).join("")
+    : '<li class="meta">まだ予約はありません</li>';
+
+  $("rushBtn").disabled = s.rush.running;
+  $("rushNote").textContent = s.rush.running ? `流しています… ${s.rush.done}/${s.rush.total}人` : "";
+}
+
+async function load() {
+  try { const r = await fetch(`/api/state?day=${day}`); render(await r.json()); } catch (e) {}
+}
+
+$("rushBtn").onclick = async () => { await fetch("/api/rush?n=20", {method: "POST"}); load(); };
+$("resetBtn").onclick = async () => {
+  if (!confirm("すべての予約を消して初期状態に戻しますか?")) return;
+  await fetch("/api/reset", {method: "POST"}); prev = {}; firstLoad = true; load();
+};
+$("tryBtn").onclick = async () => {
+  $("tryBtn").disabled = true; $("tryOut").innerHTML = '<p class="note">配っています…</p>';
+  try {
+    const r = await fetch("/api/try", {method: "POST", headers: {"Content-Type": "application/json"},
+                                        body: JSON.stringify({text: $("tryText").value})});
+    const p = await r.json();
+    const items = (p["旅程"] || []).filter(i => i.type === "体験");
+    $("tryOut").innerHTML = `<p class="note">読み取った興味: ${esc((p["読み取った興味"] || []).join("・"))} / スタイル: ${esc(p["スタイル"])} / 読み取り方法: ${esc(p["読み取り方法"])}</p>
+      <ul class="plan">${items.map(i => `<li><b>${i.day}日目 ${esc(i.slot_name)}</b> ${esc(i.name)}<span class="tag">${esc(i["枠の種類"])}</span>
+      <div class="why">${esc(i["理由"])}</div></li>`).join("") || "<li>配れる枠がありませんでした</li>"}</ul>`;
+  } catch (e) { $("tryOut").innerHTML = '<p class="note">うまく届きませんでした。もう一度押してください。</p>'; }
+  $("tryBtn").disabled = false; load();
+};
+
+load();
+setInterval(load, 2000);
+</script>
+</body>
+</html>

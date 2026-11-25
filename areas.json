@@ -1,0 +1,321 @@
+{
+  "_説明": "札幌のエリアと、時間帯ごとの受け入れ上限(cap)・アプリを使わない人の混雑(baseline)。数値はすべて300人規模のシミュレーション用の仮の値です。実データで置き換えてください。 map は模式図上の位置(実際の距離ではない)。",
+  "slots": [
+    {
+      "id": "morning",
+      "name": "朝",
+      "hours": "7-10時"
+    },
+    {
+      "id": "late_morning",
+      "name": "午前",
+      "hours": "10-13時"
+    },
+    {
+      "id": "afternoon",
+      "name": "午後",
+      "hours": "13-16時"
+    },
+    {
+      "id": "evening",
+      "name": "夕方",
+      "hours": "16-19時"
+    },
+    {
+      "id": "night",
+      "name": "夜",
+      "hours": "19-22時"
+    }
+  ],
+  "days": [
+    {
+      "id": 1,
+      "name": "1日目(月)",
+      "weekend": false
+    },
+    {
+      "id": 2,
+      "name": "2日目(火)",
+      "weekend": false
+    },
+    {
+      "id": 3,
+      "name": "3日目(水)",
+      "weekend": false
+    },
+    {
+      "id": 4,
+      "name": "4日目(木)",
+      "weekend": false
+    },
+    {
+      "id": 5,
+      "name": "5日目(金)",
+      "weekend": false
+    },
+    {
+      "id": 6,
+      "name": "6日目(土)",
+      "weekend": true
+    },
+    {
+      "id": 7,
+      "name": "7日目(日)",
+      "weekend": true
+    }
+  ],
+  "weekend_baseline_multiplier": 1.3,
+  "areas": [
+    {
+      "id": "odori",
+      "name": "大通・狸小路",
+      "central": true,
+      "uphill": false,
+      "cap": {
+        "morning": 80,
+        "late_morning": 120,
+        "afternoon": 120,
+        "evening": 120,
+        "night": 120
+      },
+      "baseline": {
+        "morning": 10,
+        "late_morning": 30,
+        "afternoon": 40,
+        "evening": 40,
+        "night": 30
+      },
+      "map": {
+        "x": 182,
+        "y": 140,
+        "short": "大通"
+      }
+    },
+    {
+      "id": "susukino",
+      "name": "すすきの",
+      "central": true,
+      "uphill": false,
+      "cap": {
+        "morning": 20,
+        "late_morning": 40,
+        "afternoon": 60,
+        "evening": 100,
+        "night": 120
+      },
+      "baseline": {
+        "morning": 0,
+        "late_morning": 5,
+        "afternoon": 15,
+        "evening": 40,
+        "night": 55
+      },
+      "map": {
+        "x": 230,
+        "y": 204,
+        "short": "すすきの"
+      }
+    },
+    {
+      "id": "nijo",
+      "name": "二条市場",
+      "central": true,
+      "uphill": false,
+      "cap": {
+        "morning": 45,
+        "late_morning": 45,
+        "afternoon": 30,
+        "evening": 0,
+        "night": 0
+      },
+      "baseline": {
+        "morning": 15,
+        "late_morning": 20,
+        "afternoon": 10,
+        "evening": 0,
+        "night": 0
+      },
+      "map": {
+        "x": 305,
+        "y": 150,
+        "short": "二条市場"
+      }
+    },
+    {
+      "id": "clocktower",
+      "name": "時計台・テレビ塔",
+      "central": true,
+      "uphill": false,
+      "cap": {
+        "morning": 60,
+        "late_morning": 60,
+        "afternoon": 60,
+        "evening": 60,
+        "night": 40
+      },
+      "baseline": {
+        "morning": 5,
+        "late_morning": 25,
+        "afternoon": 30,
+        "evening": 20,
+        "night": 10
+      },
+      "map": {
+        "x": 255,
+        "y": 104,
+        "short": "時計台"
+      }
+    },
+    {
+      "id": "hokudai",
+      "name": "北大",
+      "central": false,
+      "uphill": false,
+      "cap": {
+        "morning": 90,
+        "late_morning": 90,
+        "afternoon": 90,
+        "evening": 60,
+        "night": 10
+      },
+      "baseline": {
+        "morning": 5,
+        "late_morning": 15,
+        "afternoon": 20,
+        "evening": 10,
+        "night": 0
+      },
+      "map": {
+        "x": 190,
+        "y": 42,
+        "short": "北大"
+      }
+    },
+    {
+      "id": "maruyama",
+      "name": "円山(神宮・動物園・カフェ)",
+      "central": false,
+      "uphill": false,
+      "cap": {
+        "morning": 40,
+        "late_morning": 90,
+        "afternoon": 90,
+        "evening": 50,
+        "night": 20
+      },
+      "baseline": {
+        "morning": 10,
+        "late_morning": 30,
+        "afternoon": 35,
+        "evening": 10,
+        "night": 5
+      },
+      "map": {
+        "x": 68,
+        "y": 140,
+        "short": "円山"
+      }
+    },
+    {
+      "id": "asahiyama",
+      "name": "旭山",
+      "central": false,
+      "uphill": true,
+      "_note": "capは住民と決めた受け入れ上限を想定。アプリの設定で変えられます",
+      "cap": {
+        "morning": 25,
+        "late_morning": 25,
+        "afternoon": 25,
+        "evening": 25,
+        "night": 15
+      },
+      "baseline": {
+        "morning": 2,
+        "late_morning": 3,
+        "afternoon": 3,
+        "evening": 6,
+        "night": 4
+      },
+      "map": {
+        "x": 78,
+        "y": 236,
+        "short": "旭山"
+      }
+    },
+    {
+      "id": "moiwa",
+      "name": "藻岩山",
+      "central": false,
+      "uphill": true,
+      "cap": {
+        "morning": 0,
+        "late_morning": 30,
+        "afternoon": 40,
+        "evening": 50,
+        "night": 70
+      },
+      "baseline": {
+        "morning": 0,
+        "late_morning": 10,
+        "afternoon": 15,
+        "evening": 25,
+        "night": 35
+      },
+      "map": {
+        "x": 165,
+        "y": 278,
+        "short": "藻岩山"
+      }
+    },
+    {
+      "id": "jozankei",
+      "name": "定山渓",
+      "central": false,
+      "uphill": true,
+      "cap": {
+        "morning": 20,
+        "late_morning": 60,
+        "afternoon": 70,
+        "evening": 60,
+        "night": 40
+      },
+      "baseline": {
+        "morning": 5,
+        "late_morning": 15,
+        "afternoon": 25,
+        "evening": 25,
+        "night": 20
+      },
+      "map": {
+        "x": 38,
+        "y": 310,
+        "short": "定山渓"
+      }
+    },
+    {
+      "id": "farm",
+      "name": "郊外の農園",
+      "central": false,
+      "uphill": true,
+      "cap": {
+        "morning": 20,
+        "late_morning": 25,
+        "afternoon": 25,
+        "evening": 0,
+        "night": 0
+      },
+      "baseline": {
+        "morning": 0,
+        "late_morning": 0,
+        "afternoon": 0,
+        "evening": 0,
+        "night": 0
+      },
+      "map": {
+        "x": 300,
+        "y": 292,
+        "short": "郊外の農園"
+      }
+    }
+  ]
+}

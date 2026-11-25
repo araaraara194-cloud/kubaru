@@ -1,0 +1,478 @@
+{
+ "_説明": "2〜3時間のパッケージ。mode は「会う」(地元の人と交流)・「会わない」(静かに過ごす)・「どちらでも」。tags は旅行者の興味と照らし合わせる。staple=true は定番。 awareness は、アプリなしで旅行者がそのパッケージを知っている確率(仮定。リピーターは1.6倍)。matching=true は地元の人とのマッチングが必要で、このサービス経由でしか参加できない体験。 kind は枠の種類。「予約」=席を確保できる(seats=1コマあたりの席数)。「案内」=予約のない場所。窓口はすすめる人数を絞れるだけで、実際の人数は管理できない。",
+ "free_time": {
+  "id": "FREE",
+  "name": "宿でのんびり・自由時間",
+  "area": null
+ },
+ "packages": [
+  {
+   "id": "P01",
+   "name": "二条市場で海鮮朝ごはん",
+   "area": "nijo",
+   "slots": [
+    "morning",
+    "late_morning"
+   ],
+   "mode": "どちらでも",
+   "staple": true,
+   "tags": [
+    "美味しいもの",
+    "定番"
+   ],
+   "awareness": 1,
+   "matching": false,
+   "icon": "🍣",
+   "kind": "案内"
+  },
+  {
+   "id": "P02",
+   "name": "時計台とテレビ塔めぐり",
+   "area": "clocktower",
+   "slots": [
+    "late_morning",
+    "afternoon"
+   ],
+   "mode": "どちらでも",
+   "staple": true,
+   "tags": [
+    "観光スポット",
+    "写真",
+    "定番"
+   ],
+   "awareness": 1,
+   "matching": false,
+   "icon": "🕰️",
+   "kind": "案内"
+  },
+  {
+   "id": "P03",
+   "name": "大通公園さんぽとカフェ",
+   "area": "odori",
+   "slots": [
+    "late_morning",
+    "afternoon",
+    "evening"
+   ],
+   "mode": "どちらでも",
+   "staple": true,
+   "tags": [
+    "観光スポット",
+    "写真",
+    "定番"
+   ],
+   "awareness": 1,
+   "matching": false,
+   "icon": "🌳",
+   "kind": "案内"
+  },
+  {
+   "id": "P04",
+   "name": "狸小路で買い物",
+   "area": "odori",
+   "slots": [
+    "afternoon",
+    "evening"
+   ],
+   "mode": "どちらでも",
+   "staple": true,
+   "tags": [
+    "買い物",
+    "定番"
+   ],
+   "awareness": 1,
+   "matching": false,
+   "icon": "🛍️",
+   "kind": "案内"
+  },
+  {
+   "id": "P05",
+   "name": "すすきのでジンギスカン",
+   "area": "susukino",
+   "slots": [
+    "evening",
+    "night"
+   ],
+   "mode": "どちらでも",
+   "staple": true,
+   "tags": [
+    "美味しいもの",
+    "定番",
+    "夜"
+   ],
+   "awareness": 1,
+   "matching": false,
+   "icon": "🍖",
+   "kind": "予約",
+   "seats": 40
+  },
+  {
+   "id": "P06",
+   "name": "すすきのでラーメンとはしご酒",
+   "area": "susukino",
+   "slots": [
+    "night"
+   ],
+   "mode": "どちらでも",
+   "staple": true,
+   "tags": [
+    "美味しいもの",
+    "定番",
+    "夜"
+   ],
+   "awareness": 1,
+   "matching": false,
+   "icon": "🍜",
+   "kind": "案内"
+  },
+  {
+   "id": "P07",
+   "name": "朝のポプラ並木と北大キャンパスさんぽ",
+   "area": "hokudai",
+   "slots": [
+    "morning",
+    "late_morning"
+   ],
+   "mode": "会わない",
+   "staple": false,
+   "tags": [
+    "自然",
+    "歴史・学び",
+    "写真",
+    "静けさ"
+   ],
+   "awareness": 0.35,
+   "matching": false,
+   "icon": "🌲",
+   "kind": "案内"
+  },
+  {
+   "id": "P08",
+   "name": "北大総合博物館をじっくり見る",
+   "area": "hokudai",
+   "slots": [
+    "late_morning",
+    "afternoon"
+   ],
+   "mode": "どちらでも",
+   "staple": false,
+   "tags": [
+    "歴史・学び"
+   ],
+   "awareness": 0.3,
+   "matching": false,
+   "icon": "🦕",
+   "kind": "案内"
+  },
+  {
+   "id": "P09",
+   "name": "北大の研究室をたずねる",
+   "area": "hokudai",
+   "slots": [
+    "afternoon"
+   ],
+   "mode": "会う",
+   "staple": false,
+   "tags": [
+    "歴史・学び",
+    "交流"
+   ],
+   "awareness": 0,
+   "matching": true,
+   "icon": "🔬",
+   "kind": "予約",
+   "seats": 6
+  },
+  {
+   "id": "P10",
+   "name": "北大生と学食ランチ",
+   "area": "hokudai",
+   "slots": [
+    "late_morning"
+   ],
+   "mode": "会う",
+   "staple": false,
+   "tags": [
+    "美味しいもの",
+    "交流"
+   ],
+   "awareness": 0,
+   "matching": true,
+   "icon": "🍱",
+   "kind": "予約",
+   "seats": 8
+  },
+  {
+   "id": "P11",
+   "name": "朝の北海道神宮と円山登山",
+   "area": "maruyama",
+   "slots": [
+    "morning"
+   ],
+   "mode": "会わない",
+   "staple": false,
+   "tags": [
+    "自然",
+    "歴史・学び",
+    "静けさ",
+    "アクティビティ"
+   ],
+   "awareness": 0.4,
+   "matching": false,
+   "icon": "⛩️",
+   "kind": "案内"
+  },
+  {
+   "id": "P12",
+   "name": "円山動物園",
+   "area": "maruyama",
+   "slots": [
+    "late_morning",
+    "afternoon"
+   ],
+   "mode": "どちらでも",
+   "staple": false,
+   "tags": [
+    "観光スポット",
+    "家族"
+   ],
+   "awareness": 0.5,
+   "matching": false,
+   "icon": "🐘",
+   "kind": "案内"
+  },
+  {
+   "id": "P13",
+   "name": "円山の喫茶店で店主と話す",
+   "area": "maruyama",
+   "slots": [
+    "afternoon",
+    "evening"
+   ],
+   "mode": "会う",
+   "staple": false,
+   "tags": [
+    "美味しいもの",
+    "交流"
+   ],
+   "awareness": 0,
+   "matching": true,
+   "icon": "☕",
+   "kind": "予約",
+   "seats": 6
+  },
+  {
+   "id": "P14",
+   "name": "円山のパン屋と雑貨めぐり",
+   "area": "maruyama",
+   "slots": [
+    "late_morning",
+    "afternoon"
+   ],
+   "mode": "会わない",
+   "staple": false,
+   "tags": [
+    "買い物",
+    "美味しいもの"
+   ],
+   "awareness": 0.2,
+   "matching": false,
+   "icon": "🥐",
+   "kind": "案内"
+  },
+  {
+   "id": "P15",
+   "name": "旭山記念公園で夕暮れから夜景まで",
+   "area": "asahiyama",
+   "slots": [
+    "evening"
+   ],
+   "mode": "会わない",
+   "staple": false,
+   "tags": [
+    "自然",
+    "写真",
+    "夜景",
+    "静けさ"
+   ],
+   "awareness": 0.15,
+   "matching": false,
+   "icon": "🌃",
+   "kind": "案内"
+  },
+  {
+   "id": "P16",
+   "name": "旭山の森をひとり歩き",
+   "area": "asahiyama",
+   "slots": [
+    "morning",
+    "late_morning",
+    "afternoon"
+   ],
+   "mode": "会わない",
+   "staple": false,
+   "tags": [
+    "自然",
+    "静けさ",
+    "アクティビティ"
+   ],
+   "awareness": 0.05,
+   "matching": false,
+   "icon": "🥾",
+   "kind": "案内"
+  },
+  {
+   "id": "P17",
+   "name": "旭山の住民宅で家庭料理",
+   "area": "asahiyama",
+   "slots": [
+    "evening",
+    "night"
+   ],
+   "mode": "会う",
+   "staple": false,
+   "tags": [
+    "美味しいもの",
+    "交流"
+   ],
+   "awareness": 0,
+   "matching": true,
+   "icon": "🍲",
+   "kind": "予約",
+   "seats": 6
+  },
+  {
+   "id": "P18",
+   "name": "農家で収穫してその場で食べる",
+   "area": "farm",
+   "slots": [
+    "morning",
+    "late_morning",
+    "afternoon"
+   ],
+   "mode": "会う",
+   "staple": false,
+   "tags": [
+    "美味しいもの",
+    "自然",
+    "交流",
+    "家族"
+   ],
+   "awareness": 0,
+   "matching": true,
+   "icon": "🌽",
+   "kind": "予約",
+   "seats": 10
+  },
+  {
+   "id": "P19",
+   "name": "藻岩山ロープウェイで夜景",
+   "area": "moiwa",
+   "slots": [
+    "evening",
+    "night"
+   ],
+   "mode": "どちらでも",
+   "staple": false,
+   "tags": [
+    "観光スポット",
+    "夜景",
+    "写真"
+   ],
+   "awareness": 0.6,
+   "matching": false,
+   "icon": "🚡",
+   "kind": "案内"
+  },
+  {
+   "id": "P20",
+   "name": "定山渓温泉で日帰り湯",
+   "area": "jozankei",
+   "slots": [
+    "afternoon",
+    "evening"
+   ],
+   "mode": "会わない",
+   "staple": false,
+   "tags": [
+    "温泉",
+    "静けさ",
+    "自然"
+   ],
+   "awareness": 0.5,
+   "matching": false,
+   "icon": "♨️",
+   "kind": "案内"
+  },
+  {
+   "id": "P21",
+   "name": "定山渓の渓谷さんぽ",
+   "area": "jozankei",
+   "slots": [
+    "late_morning",
+    "afternoon"
+   ],
+   "mode": "会わない",
+   "staple": false,
+   "tags": [
+    "自然",
+    "写真",
+    "アクティビティ"
+   ],
+   "awareness": 0.3,
+   "matching": false,
+   "icon": "🍁",
+   "kind": "案内"
+  },
+  {
+   "id": "P22",
+   "name": "定山渓の宿主と晩酌",
+   "area": "jozankei",
+   "slots": [
+    "night"
+   ],
+   "mode": "会う",
+   "staple": false,
+   "tags": [
+    "美味しいもの",
+    "交流",
+    "温泉"
+   ],
+   "awareness": 0,
+   "matching": true,
+   "icon": "🍶",
+   "kind": "予約",
+   "seats": 6
+  }
+ ],
+ "fixed_plans": {
+  "_説明": "旅行者が来る前に自分で決めてしまう定番の予定。AIは動かせない(=混雑の中で、AIが手を出せない分)。",
+  "options": [
+   {
+    "name": "大通公園(予約済みの予定)",
+    "area": "odori",
+    "slot": "afternoon"
+   },
+   {
+    "name": "すすきので夕食(予約済み)",
+    "area": "susukino",
+    "slot": "night"
+   },
+   {
+    "name": "時計台(予定に入れていた)",
+    "area": "clocktower",
+    "slot": "late_morning"
+   },
+   {
+    "name": "二条市場(予定に入れていた)",
+    "area": "nijo",
+    "slot": "morning"
+   },
+   {
+    "name": "すすきのでカニ(予約済み)",
+    "area": "susukino",
+    "slot": "evening"
+   }
+  ]
+ }
+}
