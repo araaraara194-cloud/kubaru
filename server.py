@@ -10,9 +10,36 @@ from __future__ import annotations
 
 import os
 import random
+import sys
 import threading
 import time
+import zipfile
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+
+
+def _unpack_if_needed():
+    """kubaru/ と data/ フォルダが無いときは、同じ場所にある zip から取り出す(GitHubにフォルダを上げられなかった場合の保険)。"""
+    if (ROOT / "kubaru" / "window.py").exists() and (ROOT / "data" / "areas.json").exists():
+        return
+    for z in sorted(ROOT.glob("*.zip")):
+        with zipfile.ZipFile(z) as zf:
+            for name in zf.namelist():
+                if name.endswith("/"):
+                    continue
+                rel = name.split("/", 1)[1] if "/" in name else name
+                if rel.startswith(("kubaru/", "data/")):
+                    dest = ROOT / rel
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(zf.read(name))
+        if (ROOT / "kubaru" / "window.py").exists():
+            print(f"[kubaru] {z.name} から kubaru/ と data/ を取り出しました", flush=True)
+            return
+
+
+_unpack_if_needed()
+sys.path.insert(0, str(ROOT))
 
 import uvicorn
 from starlette.requests import Request
