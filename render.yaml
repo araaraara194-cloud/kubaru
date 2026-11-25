@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: kubaru
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-server.txt
+    startCommand: python server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ANTHROPIC_API_KEY
+        sync: false
