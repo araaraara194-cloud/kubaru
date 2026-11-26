@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.araaraara194-cloud/kubaru",
+  "title": "Kubaru AI - Sapporo tourism allocation window",
+  "description": "Plans Sapporo, Japan itineraries within resident-agreed crowd caps so AI agents don't herd.",
+  "repository": {
+    "url": "https://github.com/araaraara194-cloud/kubaru",
+    "source": "github"
+  },
+  "websiteUrl": "https://kubaru.onrender.com",
+  "version": "0.2.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://kubaru.onrender.com/mcp"
+    }
+  ]
+}
