@@ -31,6 +31,9 @@ from .scoring import FREE_ID, free_time_score, rule_score
 STATE_PATH = Path(os.environ.get("KUBARU_STATE", Path(__file__).resolve().parent.parent / "state" / "bookings.json"))
 HOLD_MINUTES = 15
 OFFER_MINUTES = 30          # 候補の有効時間
+PICKS_PER_DAY = 2           # 旅行者が1日に選ぶ体験の数の目安(候補の重みづけに使う)
+GHOST_RATE = 0.5            # 押さえずに終わった候補のうち、それでも来ると見込む割合(仮定)
+OFFER_KEEP_HOURS = 24       # 押さえなかった候補を「見込み」として数え続ける時間(デモでは1日)
 LOCK = threading.RLock()   # 同時に来た問い合わせを1件ずつ処理するための鍵
 NEG = -1e6
 
@@ -135,7 +138,8 @@ class Window:
         for o in self.offers:
             if o["status"] == "open" and now - o["created"] > OFFER_MINUTES * 60:
                 o["status"] = "expired"
-        self.offers = [o for o in self.offers if now - o["created"] < 6 * 3600]   # 古い記録は捨てる
+        self.offers = [o for o in self.offers if now - o["created"] < OFFER_KEEP_HOURS * 3600]
+        self._ghost = None
 
     # ------------------------------------------------------------ 枠の計算
     def _day(self, day: int) -> dict:
@@ -149,8 +153,45 @@ class Window:
                    if b.status in ("held", "confirmed") and b.day == day and b.slot == slot and b.area == area)
 
     def occupied(self, day: int, slot: str, area: str) -> float:
-        """アプリを使わない人(baseline) + このサービスで配った人。"""
-        return self.world.baseline(area, self._day(day), slot) + self.booked(day, slot, area)
+        """ふだんの人出(予測) + このサービスで押さえた人 + 押さえずに終わった候補からの見込み。"""
+        return (self.world.baseline(area, self._day(day), slot) + self.booked(day, slot, area)
+                + self.ghost(day, slot, area))
+
+    # ------------------------------------------------------------ AIが押さえずに終わった分の見込み
+    def ghost(self, day: int, slot: str, area: str) -> float:
+        """押さえずに終わった(失効した)候補は、GHOST_RATE の確率でそれでも来るものとして、
+        同じ時間帯に出した候補の数で割って数える。AIが最後まで報告しなくても枠が崩れないようにするため。"""
+        if getattr(self, "_ghost", None) is None:
+            g = {}
+            for o in self.offers:
+                if o["status"] != "expired":
+                    continue
+                for (d, s_, a), w_ in self._option_weights(o).items():
+                    g[(d, s_, a)] = g.get((d, s_, a), 0.0) + GHOST_RATE * w_
+            self._ghost = g
+        return self._ghost.get((day, slot, area), 0.0)
+
+    def book_rate(self) -> tuple[float | None, int]:
+        """候補を渡した相手のうち、押さえる所まで進んだ割合(結果が出たものだけで数える)。"""
+        done = [o for o in self.offers if o["status"] in ("used", "expired")]
+        if not done:
+            return None, 0
+        return sum(1 for o in done if o["status"] == "used") / len(done), len(done)
+
+    def effective_margin(self) -> float:
+        """押さえる割合が低いほど、案内型の安全の余裕を広げる(0.8以上なら基本の値、最大0.4)。"""
+        rate, n = self.book_rate()
+        if rate is None or n < 5:
+            return self.margin
+        return float(min(0.4, max(self.margin, self.margin + 0.3 * (0.8 - rate))))
+
+    def abandon_offer(self, offer_id: str) -> None:
+        """デモ用: 押さえずにやめた(AIが報告しなかった)ことにする。"""
+        for o in self.offers:
+            if o["id"] == offer_id and o["status"] == "open":
+                o["status"] = "expired"
+        self._ghost = None
+        self.save()
 
     def seats_left(self, day: int, slot: str, pid: str) -> int:
         p = self.world.packages[pid]
@@ -169,7 +210,7 @@ class Window:
         area_left = cap - self.occupied(day, slot, p.area)
         if p.kind == "予約":
             return int(max(0, min(self.seats_left(day, slot, pid), np.floor(area_left))))
-        return int(max(0, np.floor(area_left - self.margin * cap)))
+        return int(max(0, np.floor(area_left - self.effective_margin() * cap)))
 
     def remaining(self, day: int, slot: str, area: str) -> int:
         return int(max(0, np.floor(self.world.cap(area, slot) - self.occupied(day, slot, area))))
@@ -190,8 +231,12 @@ class Window:
                 "案内型": "予約のない場所(公園・市場・街歩きなど)。窓口はすすめる人数を絞れるだけ。"
                           "実際の人数は ふだんの人出(予測) + 案内した人のうち実際に行く人 で決まるので、"
                           f"上限の{self.margin:.0%}を安全の余裕として残して案内する。",
-                "混雑率": "(ふだんの人出の予測 + 窓口が送った人数) ÷ 上限",
+                "混雑率": "(ふだんの人出の予測 + 窓口が押さえた人数 + 押さえずに終わった候補からの見込み) ÷ 上限",
+                "見込み": f"AIが候補をもらったのに押さえなかった場合も、{GHOST_RATE:.0%}の確率で来るものとして数える。",
+                "余裕の自動調整": "候補を渡した相手のうち押さえた割合が8割を下回ると、案内型の安全の余裕を広げる(最大4割)。",
             },
+            "いまの安全の余裕": round(self.effective_margin(), 2),
+            "押さえた割合": (lambda r: None if r[0] is None else f"{r[0]:.0%}({r[1]}件中)")(self.book_rate()),
             "快適ライン": self.comfort,
             "仮押さえの有効時間(分)": HOLD_MINUTES,
             "時間帯": [f'{s["name"]}({s["hours"]})' for s in self.world.slots],
@@ -298,19 +343,23 @@ class Window:
         return tags, style, method, summary
 
     # ------------------------------------------------------------ 候補(メニュー)を配る → AIが選ぶ → 押さえる
+    def _option_weights(self, o: dict) -> dict:
+        """1つの候補セットが、各(日, 時間帯, エリア)に何人分の見込みになるか。
+        旅行者は1日に PICKS_PER_DAY 個ほど選ぶので、その日の候補数で割って配る。"""
+        per_day = {}
+        for op in o["options"]:
+            per_day.setdefault(op["day"], []).append(op)
+        w = {}
+        for d, ops in per_day.items():
+            share = o["party"] * min(1.0, PICKS_PER_DAY / len(ops))
+            for op in ops:
+                key = (d, op["slot"], self.world.packages[op["pid"]].area)
+                w[key] = w.get(key, 0.0) + share
+        return w
+
     def soft_load(self, day: int, slot: str, area: str) -> float:
-        """配ったけれどまだ選ばれていない候補を、少しずつ混み具合に数える(同じ候補を全員に見せないため)。"""
-        load = 0.0
-        for o in self.offers:
-            if o["status"] != "open":
-                continue
-            per = {}
-            for op in o["options"]:
-                per.setdefault((op["day"], op["slot"]), []).append(op)
-            for (d, s_), ops in per.items():
-                if d == day and s_ == slot:
-                    load += sum(o["party"] for op in ops if self.world.packages[op["pid"]].area == area) / max(1, len(ops))
-        return load
+        """渡したけれどまだ選ばれていない候補を、見込みとして少しずつ数える(同じ候補を全員に見せないため)。"""
+        return sum(self._option_weights(o).get((day, slot, area), 0.0) for o in self.offers if o["status"] == "open")
 
     def offer_menu(self, request: str = "", days: list[int] | None = None, party: int = 1,
                    interests: list | None = None, style: str | None = None, first_time: bool = True,
@@ -359,6 +408,7 @@ class Window:
         offer = {"id": oid, "created": time.time(), "agent": agent, "traveler": t.id, "party": party,
                  "days": days, "tags": tags, "style": style, "method": method, "options": options, "status": "open"}
         self.offers.append(offer)
+        self._ghost = None
         self.save()
         seen, full_view = set(), []
         for f_ in full:
@@ -416,6 +466,7 @@ class Window:
             done.append(self._option_view(op, o["tags"], o["party"]))
         if done:
             o["status"], o["hold_id"] = "used", hold_id
+        self._ghost = None
         self.save()
         left = [self._option_view(op, o["tags"], o["party"]) for op in o["options"]
                 if op["code"] not in {d["code"] for d in done} and (op["day"], op["slot"]) not in taken

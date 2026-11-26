@@ -120,13 +120,17 @@ async def state(request: Request):
             "cells": cells, "feed": feed,
             "kpi": {"bookings": len(live), "people": sum(b.party for b in live),
                     "offers": sum(1 for o in w.offers if o["status"] == "open"),
+                    "book_rate": (lambda r: None if r[0] is None else round(r[0], 2))(w.book_rate()),
+                    "book_n": w.book_rate()[1],
+                    "margin": round(w.effective_margin(), 2),
+                    "ghost": round(sum(w.ghost(day, s_, a) for s_ in world.slot_ids for a in world.areas), 1),
                     "agents": len({b.agent for b in live}), "over": over},
             "ai": {"enabled": ai.enabled(), "model": ai.MODEL},
             "rush": RUSH, "comfort": w.comfort,
         })
 
 
-def _rush(n: int):
+def _rush(n: int, book: float = 0.85):
     """デモ: AIエージェントn人が、候補をもらう → 旅行者の好みで選ぶ → 押さえる、を順番に行う。"""
     RUSH.update(running=True, done=0, total=n)
     try:
@@ -144,9 +148,11 @@ def _rush(n: int):
                     continue
                 picks.append((c["day"], c["code"]))
                 used.add((c["day"], c["slot"]))
-            if random.random() < 0.85:
-                with LOCK:
+            with LOCK:
+                if random.random() < book:
                     Window.open().book_offer(m["offer_id"], [p[1] for p in picks], agent=agent)
+                else:
+                    Window.open().abandon_offer(m["offer_id"])   # 押さえずに終わったAI(報告なし)
             RUSH["done"] = i + 1
             time.sleep(0.3)
     finally:
@@ -158,7 +164,11 @@ async def rush(request: Request):
     if RUSH["running"]:
         return JSONResponse({"ok": False, "message": "いま流している最中です"})
     n = max(1, min(100, int(request.query_params.get("n", 20))))
-    threading.Thread(target=_rush, args=(n,), daemon=True).start()
+    try:
+        book = max(0.0, min(1.0, float(request.query_params.get("book", 0.85))))
+    except ValueError:
+        book = 0.85
+    threading.Thread(target=_rush, args=(n, book), daemon=True).start()
     return JSONResponse({"ok": True, "message": f"AIエージェント{n}人を順番に流します"})
 
 
