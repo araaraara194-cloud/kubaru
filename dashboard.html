@@ -20,8 +20,9 @@
   .lead { color: var(--sub); font-size: 14px; margin: 0 0 16px; line-height: 1.6; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  @media (max-width: 820px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 520px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
   .kpi .v { font-size: 26px; font-weight: 700; }
   .kpi .l { font-size: 12px; color: var(--sub); }
   .ok { color: var(--good); }
@@ -53,6 +54,17 @@
   .plan li { margin: 6px 0; font-size: 14px; }
   .plan .why { color: var(--sub); font-size: 12px; }
   h2 { font-size: 16px; margin: 0 0 12px; }
+  .hero h2 { font-size: 19px; margin-bottom: 4px; }
+  .hero textarea { font-size: 16px; min-height: 76px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chips button { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; }
+  button.big { padding: 11px 16px; font-size: 15px; }
+  button.alt { background: #0f7b5f; border-color: #0f7b5f; }
+  @media (max-width: 640px) { .hero .row button.big { flex: 1 1 45%; } }
+  pre.prompt { white-space: pre-wrap; font-size: 12.5px; background: var(--bg); border: 1px solid var(--line);
+               border-radius: 8px; padding: 8px 10px; }
+  code { font-size: 12px; overflow-wrap: anywhere; }
+  summary { cursor: pointer; }
   .two { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
   .two > * { min-width: 0; }
   @media (max-width: 820px) { .two { grid-template-columns: 1fr; } }
@@ -65,22 +77,41 @@
 <body>
 <main>
   <h1>くばるAI 配分窓口 — ライブ</h1>
-  <p class="lead">AIエージェントがこの窓口に旅程を頼むと、住民と決めた上限を超えないように1件ずつ枠を配ります。
-    この画面は2秒ごとに自動で更新されます。数値はデモ用の仮の値です。</p>
+  <p class="lead">あなたのAIがこの窓口に旅程を頼むと、住民と決めた上限を超えないように1件ずつ枠が配られます。
+    下の混み具合は2秒ごとに自動で更新されます。数値はデモ用の仮の値です。</p>
 
-  <div class="card">
-    <div class="row">
-      <div class="mcp" id="mcpUrl">…</div>
-      <button id="copyBtn">URLをコピー</button>
+  <div class="card hero">
+    <h2>札幌の旅程を、AIに頼む</h2>
+    <p class="note" style="margin:0 0 8px">希望をそのまま書いてください。日数と人数も文章から読み取ります(例:「2泊3日」「ふたり」)。</p>
+    <textarea id="wish">2泊3日、ふたりで札幌。海鮮と温泉が好きで、人混みは苦手。</textarea>
+    <div class="chips" id="chips">
+      <button data-t="2泊3日、ふたりで札幌。海鮮と温泉が好きで、人混みは苦手。">海鮮と温泉・ふたり</button>
+      <button data-t="日帰りでひとり。地元の人と話してみたい。">日帰り・地元の人と</button>
+      <button data-t="3日間、家族4人。子どもと自然や動物を楽しみたい。">家族で自然</button>
+      <button data-t="1泊2日。夜景とお酒、静かな場所がいい。">夜景とお酒</button>
     </div>
-    <p class="note" style="margin:8px 0 0">このURLを Claude の「設定 → コネクタ → カスタムコネクタを追加」に貼ると、そのClaudeがこの窓口を使えるようになります。
-      <span id="aiStatus"></span></p>
+    <div class="row" style="margin-top:10px">
+      <button class="primary big" id="openClaude">Claudeで開く</button>
+      <button class="primary big alt" id="openGpt">ChatGPTで開く</button>
+      <button class="big" id="copyPrompt">頼む文をコピー</button>
+      <button class="big" id="tryBtn">この画面で試す</button>
+    </div>
+    <p class="note" id="copied" style="min-height:1em;margin:6px 0 0"></p>
+    <details style="margin-top:4px"><summary class="note">AIに渡される文を見る</summary><pre class="prompt" id="promptView"></pre></details>
+    <details style="margin-top:4px"><summary class="note"><b>毎回やらなくていいように、自分のAIに覚えさせる</b></summary>
+      <p class="note">この一文を、ChatGPTの「カスタム指示(パーソナライズ)」や、Claudeの「設定 → プロフィール(Claudeへの指示)」に貼っておくと、
+        次からは「札幌2泊3日で旅程組んで」と話しかけるだけで、AIが自分でくばるAIを使います。</p>
+      <pre class="prompt" id="memoView"></pre>
+      <button id="copyMemo">この一文をコピー</button>
+    </details>
+    <div id="tryOut"></div>
   </div>
 
   <div class="kpis">
     <div class="card kpi"><div class="v" id="kBookings">0</div><div class="l">配っている体験(件)</div></div>
     <div class="card kpi"><div class="v" id="kPeople">0</div><div class="l">送る人数(延べ)</div></div>
     <div class="card kpi"><div class="v" id="kAgents">0</div><div class="l">つないだAIエージェント</div></div>
+    <div class="card kpi"><div class="v" id="kOffers">0</div><div class="l">候補を渡して相談中</div></div>
     <div class="card kpi"><div class="v" id="kOver">0</div><div class="l">上限を超えたコマ</div></div>
   </div>
 
@@ -106,15 +137,16 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2>ここから頼んでみる</h2>
-    <textarea id="tryText">海鮮が好き。人混みは苦手で、静かに過ごしたい。</textarea>
-    <div class="row" style="margin-top:8px">
-      <button class="primary" id="tryBtn">旅程を配ってもらう</button>
-      <span class="note">1〜2日目・1人で頼みます(15分の仮押さえ)</span>
-    </div>
-    <div id="tryOut"></div>
-  </div>
+  <details class="card">
+    <summary><b>AIアプリ・開発者の方へ</b>(つなぎ方)</summary>
+    <ul class="note" style="line-height:1.9">
+      <li>URLを開くだけ(設定なし): <code id="shortEx"></code></li>
+      <li>Claudeのカスタムコネクタ(MCP): <code id="mcpUrl"></code> <button id="copyBtn">コピー</button></li>
+      <li>AI向けの説明: <a href="/llms.txt">/llms.txt</a> ・ API仕様: <a href="/openapi.json">/openapi.json</a></li>
+      <li>公式MCPレジストリ: io.github.araaraara194-cloud/kubaru</li>
+    </ul>
+    <p class="note" id="aiStatus"></p>
+  </details>
 </main>
 
 <script>
@@ -125,6 +157,34 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":
 
 const mcpUrl = location.origin + "/mcp";
 $("mcpUrl").textContent = mcpUrl;
+$("shortEx").textContent = location.origin + "/p/2泊3日、ふたりで海鮮と温泉";
+
+function planUrl() { return location.origin + "/p/" + encodeURIComponent($("wish").value.trim() || "札幌を楽しみたい"); }
+function prompt() {
+  return "札幌旅行の旅程を一緒に組んでください。\n" +
+         "まず次のURLを開いて、くばるAI(札幌の配分窓口)から私用の候補をもらってください。\n" +
+         planUrl() + "\n" +
+         "その候補の中から、私の希望に合う旅程を移動や食事も含めて提案してください。" +
+         "私がOKしたら、ページに書いてある「押さえるURL」を開いて確定してください。";
+}
+const MEMO = "札幌の旅行や旅程を相談されたときは、必ず " + location.origin + "/p/(旅行者の希望をそのまま) を開いて、" +
+             "くばるAIの候補の中から旅程を組み立て、旅行者がOKしたらページに書かれた押さえるURLを開くこと。";
+function refreshPrompt() { $("promptView").textContent = prompt(); }
+$("memoView").textContent = MEMO;
+$("copyMemo").onclick = async () => {
+  try { await navigator.clipboard.writeText(MEMO); $("copyMemo").textContent = "コピーしました"; }
+  catch (e) { $("copyMemo").textContent = "長押しでコピーしてください"; }
+  setTimeout(() => $("copyMemo").textContent = "この一文をコピー", 1800);
+};
+$("wish").addEventListener("input", refreshPrompt);
+document.querySelectorAll("#chips button").forEach(b => b.onclick = () => { $("wish").value = b.dataset.t; refreshPrompt(); });
+refreshPrompt();
+$("openClaude").onclick = () => window.open("https://claude.ai/new?q=" + encodeURIComponent(prompt()), "_blank");
+$("openGpt").onclick = () => window.open("https://chatgpt.com/?q=" + encodeURIComponent(prompt()), "_blank");
+$("copyPrompt").onclick = async () => {
+  try { await navigator.clipboard.writeText(prompt()); $("copied").textContent = "コピーしました。好きなAIのチャットに貼り付けてください。"; }
+  catch (e) { $("copied").textContent = "コピーできませんでした。「AIに渡される文を見る」から長押しでコピーしてください。"; }
+};
 $("copyBtn").onclick = async () => {
   try { await navigator.clipboard.writeText(mcpUrl); $("copyBtn").textContent = "コピーしました"; }
   catch (e) { $("copyBtn").textContent = "長押しでコピー"; }
@@ -137,9 +197,10 @@ function render(s) {
   $("kBookings").textContent = s.kpi.bookings;
   $("kPeople").textContent = s.kpi.people;
   $("kAgents").textContent = s.kpi.agents;
+  $("kOffers").textContent = s.kpi.offers ?? 0;
   $("kOver").textContent = s.kpi.over;
   $("kOver").className = "v " + (s.kpi.over ? "ng" : "ok");
-  $("aiStatus").textContent = s.ai.enabled ? `希望文の読み取り: AI(${s.ai.model})` : "希望文の読み取り: ルール(APIキー未設定)";
+  $("aiStatus").textContent = s.ai.enabled ? `希望文の読み取り: AI(${s.ai.model})` : "希望文の読み取り: キーワード(APIキー未設定)";
 
   if (!$("dayTabs").children.length) {
     s.days.forEach(d => {
@@ -193,12 +254,14 @@ $("tryBtn").onclick = async () => {
   $("tryBtn").disabled = true; $("tryOut").innerHTML = '<p class="note">配っています…</p>';
   try {
     const r = await fetch("/api/try", {method: "POST", headers: {"Content-Type": "application/json"},
-                                        body: JSON.stringify({text: $("tryText").value})});
+                                        body: JSON.stringify({text: $("wish").value})});
     const p = await r.json();
-    const items = (p["旅程"] || []).filter(i => i.type === "体験");
-    $("tryOut").innerHTML = `<p class="note">読み取った興味: ${esc((p["読み取った興味"] || []).join("・"))} / スタイル: ${esc(p["スタイル"])} / 読み取り方法: ${esc(p["読み取り方法"])}</p>
-      <ul class="plan">${items.map(i => `<li><b>${i.day}日目 ${esc(i.slot_name)}</b> ${esc(i.name)}<span class="tag">${esc(i["枠の種類"])}</span>
-      <div class="why">${esc(i["理由"])}</div></li>`).join("") || "<li>配れる枠がありませんでした</li>"}</ul>`;
+    const items = p["候補"] || [];
+    $("tryOut").innerHTML = `<p class="note">あなたのAIが受け取る候補です(${p["日数"]}日・${p["人数"]}人、30分有効)。AIはこの中から相談しながら選んで組み立てます。<br>
+      読み取った興味: ${esc((p["読み取った興味"] || []).join("・"))} / スタイル: ${esc(p["スタイル"])}</p>
+      <ul class="plan">${items.map(i => `<li><b>[${esc(i.code)}] ${esc(i.day_name)} ${esc(i.slot_name)}</b> ${esc(i.name)}<span class="tag">${esc(i["枠の種類"])}</span>
+      <div class="why">${esc(i["理由"])} ・あと${i["あと送れる人数"]}人</div></li>`).join("") || "<li>配れる候補がありませんでした</li>"}</ul>
+      ${(p["上限で出せない人気の枠"] || []).length ? `<p class="note">上限に達していて出せない枠: ${p["上限で出せない人気の枠"].map(f => esc(f.day + "日目 " + f.slot_name + " " + f.name)).join(" / ")}</p>` : ""}`;
   } catch (e) { $("tryOut").innerHTML = '<p class="note">うまく届きませんでした。もう一度押してください。</p>'; }
   $("tryBtn").disabled = false; load();
 };

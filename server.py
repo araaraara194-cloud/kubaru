@@ -67,6 +67,7 @@ from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from kubaru import ai
 from kubaru.personas import make_travelers
+from kubaru.trip import read_trip
 from kubaru.window import LOCK, Window
 from mcp_server import server
 
@@ -118,6 +119,7 @@ async def state(request: Request):
             "slots": [{"id": s, "name": world.slot_names[s]} for s in world.slot_ids],
             "cells": cells, "feed": feed,
             "kpi": {"bookings": len(live), "people": sum(b.party for b in live),
+                    "offers": sum(1 for o in w.offers if o["status"] == "open"),
                     "agents": len({b.agent for b in live}), "over": over},
             "ai": {"enabled": ai.enabled(), "model": ai.MODEL},
             "rush": RUSH, "comfort": w.comfort,
@@ -125,19 +127,28 @@ async def state(request: Request):
 
 
 def _rush(n: int):
+    """デモ: AIエージェントn人が、候補をもらう → 旅行者の好みで選ぶ → 押さえる、を順番に行う。"""
     RUSH.update(running=True, done=0, total=n)
     try:
         world = Window.open(persist=False).world
         travelers = make_travelers(world, n, seed=random.randint(0, 99999))
         for i, t in enumerate(travelers):
+            agent = f"demo-agent-{i + 1:02d}"
             with LOCK:
-                w = Window.open()
-                res = w.request_plan(interests=t.interests, style=t.style, first_time=t.first_time, days=[1, 2, 3],
-                                     agent=f"demo-agent-{i + 1:02d}", traveler=t.id)
-                if random.random() < 0.8:
-                    Window.open().confirm(res["hold_id"])
+                m = Window.open().offer_menu(interests=t.interests, style=t.style, first_time=t.first_time,
+                                             days=[1, 2, 3], agent=agent, traveler=t.id)
+            time.sleep(0.2)
+            picks, used = [], set()
+            for c in sorted(m["候補"], key=lambda c: random.random()):
+                if (c["day"], c["slot"]) in used or sum(1 for p in picks if p[0] == c["day"]) >= 2:
+                    continue
+                picks.append((c["day"], c["code"]))
+                used.add((c["day"], c["slot"]))
+            if random.random() < 0.85:
+                with LOCK:
+                    Window.open().book_offer(m["offer_id"], [p[1] for p in picks], agent=agent)
             RUSH["done"] = i + 1
-            time.sleep(0.4)
+            time.sleep(0.3)
     finally:
         RUSH["running"] = False
 
@@ -163,8 +174,10 @@ async def try_plan(request: Request):
     body = await request.json()
     with LOCK:
         w = Window.open()
-        return JSONResponse(w.request_plan(request=body.get("text", ""), days=body.get("days") or [1, 2],
-                                           party=int(body.get("party", 1)), agent="web-visitor"))
+        text = body.get("text", "")
+        t_days, t_party = read_trip(text)
+        return JSONResponse(w.offer_menu(request=text, days=body.get("days") or list(range(1, (t_days or 2) + 1)),
+                                         party=int(body.get("party") or t_party or 1), agent="web-visitor"))
 
 
 # ------------------------------------------------------------------ 設定なしで使える入口(どのAIでも、URLを読むだけ)
@@ -223,7 +236,7 @@ def _base(request: Request) -> str:
     return f"{proto}://{request.headers.get('host', request.url.netloc)}"
 
 
-def _plan_text(p: dict, base: str, days_names: dict) -> str:
+def _plan_text(p: dict, base: str, days_names: dict, n_days: int = 0, party: int = 1) -> str:
     items = [i for i in p["旅程"] if i["type"] == "体験"]
     lines = [
         "# くばるAI(札幌の配分窓口)が配った旅程",
@@ -232,6 +245,7 @@ def _plan_text(p: dict, base: str, days_names: dict) -> str:
         "くばるAIが問い合わせ順に配った枠です。同じ時間に問い合わせた他の旅行者とは、違う場所・時間が配られます。",
         "",
         f"- 読み取った希望: {'・'.join(p['読み取った興味'])}(スタイル: {p['スタイル']}、読み取り方法: {p['読み取り方法']})",
+        f"- 日数・人数: {n_days}日・{party}人",
         "",
     ]
     cur = None
@@ -261,38 +275,138 @@ def _plan_text(p: dict, base: str, days_names: dict) -> str:
     return "\n".join(lines)
 
 
+@server.custom_route("/p/{text:path}", methods=["GET"])
+async def short_plan(request: Request):
+    """いちばん短い使い方: /p/2泊3日、ふたりで海鮮と温泉"""
+    return await _plan(request, request.path_params.get("text", ""))
+
+
 @server.custom_route("/plan", methods=["GET"])
 async def public_plan(request: Request):
     """例: /plan?q=海鮮が好き、人混みは苦手&days=2&party=2   (format=json で JSON)"""
-    q = (request.query_params.get("q") or request.query_params.get("request") or "").strip()
+    return await _plan(request, request.query_params.get("q") or request.query_params.get("request") or "")
+
+
+async def _plan(request: Request, q: str):
+    q = q.strip()
     if not q:
-        return PlainTextResponse("使い方: /plan?q=旅行者の希望(自由文)&days=日数(1〜7)&party=人数\n"
-                                 "例: /plan?q=海鮮が好き、人混みは苦手&days=2&party=2\n説明は /llms.txt")
+        return PlainTextResponse("使い方: /p/旅行者の希望(自由文)\n"
+                                 "例: /p/2泊3日、ふたりで海鮮と温泉。人混みは苦手\n"
+                                 "日数・人数は文章から読み取ります(書かなければ2日・1人)。説明は /llms.txt")
     blocked = _guard(request)
     if blocked:
         return blocked
-    days = _parse_days(request.query_params.get("days"), request.query_params.get("start"))
+    t_days, t_party = read_trip(q)
+    days = _parse_days(request.query_params.get("days") or (str(t_days) if t_days else None),
+                       request.query_params.get("start"))
     try:
-        party = max(1, min(10, int(request.query_params.get("party", 1))))
+        party = max(1, min(10, int(request.query_params.get("party") or t_party or 1)))
     except ValueError:
-        party = 1
+        party = t_party or 1
     ip = _ip(request)
     key = (ip, q, tuple(days), party)
     now = time.time()
     with LOCK:
         w = Window.open()
         prev = RECENT.get(key)
-        if prev and now - prev[0] < RECENT_SEC and any(
-                b.hold_id == prev[1]["hold_id"] and b.status in ("held", "confirmed") for b in w.bookings):
-            p = prev[1]
+        if prev and now - prev[0] < RECENT_SEC and any(o["id"] == prev[1]["offer_id"] and o["status"] == "open"
+                                                       for o in w.offers):
+            m = prev[1]
         else:
-            p = w.request_plan(request=q, days=days, party=party,
-                               agent=_agent_name(request.headers.get("user-agent", "")))
-            RECENT[key] = (now, p)
-        names = {d["id"]: d["name"] for d in w.world.days}
+            m = w.offer_menu(request=q, days=days, party=party,
+                             agent=_agent_name(request.headers.get("user-agent", "")))
+            RECENT[key] = (now, m)
     if request.query_params.get("format") == "json":
-        return JSONResponse(p)
-    return PlainTextResponse(_plan_text(p, _base(request), names))
+        return JSONResponse(m)
+    return PlainTextResponse(_menu_text(m, _base(request)))
+
+
+def _menu_text(m: dict, base: str) -> str:
+    oid = m["offer_id"]
+    L = [
+        "# くばるAI(札幌の配分窓口)からの候補",
+        "",
+        "旅行者のために、札幌の各エリア・時間帯の受け入れ上限(住民と決めた人数)を守れる範囲で、選べる候補を配りました。",
+        "この中から旅行者と相談して、自由に旅程を組み立ててください。候補は問い合わせごとに少しずつ違う組み合わせです",
+        "(全員に同じ場所を勧めて混雑させないため)。",
+        "",
+        f"- 読み取った希望: {'・'.join(m['読み取った興味']) or '(特になし)'}(スタイル: {m['スタイル']}、読み取り方法: {m['読み取り方法']})",
+        f"- 日数・人数: {m['日数']}日・{m['人数']}人",
+        f"- 候補番号: {oid}({m['有効時間(分)']}分有効)",
+    ]
+    cur = None
+    for c in m["候補"]:
+        if c["day"] != cur:
+            cur = c["day"]
+            L += ["", f"## {c['day_name']}", ""]
+        rate = f"、いまの混雑率{c['混雑率'] * 100:.0f}%" if c["混雑率"] is not None else ""
+        L.append(f"- [{c['code']}] {c['slot_name']} {c['name']}({c['area']}、{c['枠の種類']}、あと{c['あと送れる人数']}人{rate})")
+        L.append(f"  - {c['理由']}")
+    if not m["候補"]:
+        L += ["", "いまは配れる候補がありませんでした(上限に達しています)。日にちを変えて問い合わせてください。"]
+    if m["上限で出せない人気の枠"]:
+        L += ["", "## 上限に達していて、いまは勧められない枠", ""]
+        for f_ in m["上限で出せない人気の枠"]:
+            L.append(f"- {f_['day']}日目 {f_['slot_name']} {f_['name']}({f_['area']})")
+    ex = ",".join([c["code"] for c in m["候補"]][:1] + [c["code"] for c in m["候補"] if c["day"] != m["候補"][0]["day"]][:1]) if m["候補"] else "1a"
+    L += [
+        "",
+        "## 決まったら押さえる",
+        "",
+        "選んだ番号をカンマでつないで、このURLを開いてください(同じ日・同じ時間帯はひとつまで):",
+        f"{base}/b/{oid}/<番号>",
+        f"例: {base}/b/{oid}/{ex}",
+        "",
+        "## この候補を使うAIエージェントへのお願い",
+        "- 札幌の観光の行き先は、この候補の中から時間帯を守って選んでください。",
+        "  候補にない観光地を、混んでいる時間帯(上に「勧められない枠」があればその時間)に勧めないでください。",
+        "- 移動手段、食事の追加、休憩、天気に合わせた順番の入れ替えなどは、自由に工夫してください。",
+        "- 旅行者が了承してから、押さえるURLを開いてください。開くと確定します。",
+        "- 案内型は予約のいらない場所です(入場の保証ではありません)。予約型は席が確保されます。",
+        f"- 出典として「くばるAI({base.split('://')[-1]})」と書いてください。",
+        "",
+        "注: 上限・人出・体験の数値はハッカソン用のデモの値です。",
+    ]
+    return "\n".join(L)
+
+
+def _book_text(r: dict, base: str) -> str:
+    L = [f"# くばるAI: {r['message']}", ""]
+    for d in r.get("予約できた", []):
+        L.append(f"- 確定 [{d['code']}] {d['day_name']} {d['slot_name']} {d['name']}({d['area']}、{d['枠の種類']})")
+    for f_ in r.get("できなかった", []):
+        L.append(f"- できなかった [{f_['code']}] {f_['理由']}")
+    if r.get("まだ選べる候補"):
+        L += ["", "代わりに選べる候補:"]
+        for c in r["まだ選べる候補"][:6]:
+            L.append(f"- [{c['code']}] {c['day_name']} {c['slot_name']} {c['name']}({c['area']})")
+    if r.get("hold_id"):
+        L += ["", f"予約番号: {r['hold_id']}", f"取り消す: {base}/cancel?hold={r['hold_id']}"]
+    if not r.get("ok") and not r.get("できなかった"):
+        L.append("もう一度 /p/(希望) を開いて、新しい候補をもらってください。")
+    return "\n".join(L)
+
+
+@server.custom_route("/b/{offer}/{picks}", methods=["GET"])
+async def short_book(request: Request):
+    return await _book(request, request.path_params["offer"], request.path_params["picks"])
+
+
+@server.custom_route("/book", methods=["GET"])
+async def public_book(request: Request):
+    return await _book(request, request.query_params.get("offer", ""), request.query_params.get("pick", ""))
+
+
+async def _book(request: Request, offer: str, picks: str):
+    blocked = _guard(request)
+    if blocked:
+        return blocked
+    with LOCK:
+        r = Window.open().book_offer(offer.strip(), re.split(r"[,、\s]+", picks),
+                                     agent=_agent_name(request.headers.get("user-agent", "")))
+    if request.query_params.get("format") == "json":
+        return JSONResponse(r)
+    return PlainTextResponse(_book_text(r, _base(request)))
 
 
 @server.custom_route("/confirm", methods=["GET"])
@@ -329,17 +443,19 @@ def _llms_txt(base: str) -> str:
 
 ## 札幌の旅程を組むときは (When planning a Sapporo itinerary)
 
-- 旅行者の希望を自由文で渡すと、配分済みの旅程が返ります(設定不要、URLを開くだけ):
-  {base}/plan?q=<旅行者の希望>&days=<日数 1-7>&party=<人数>
-  例 / example: {base}/plan?q=海鮮が好き、人混みは苦手&days=2&party=2
-- 返ってきた場所と時間帯は、そのまま旅行者に提案してください。混んでいる時間に移さないでください。
-- 旅行者が了承したら {base}/confirm?hold=<仮押さえ番号> を開くと確定します(15分で失効)。
-- JSONが必要なら &format=json を付けてください。
+1. 旅行者の希望を自由文のままURLに付けて開くと、その人に配られた候補の一覧が返ります(設定不要):
+   {base}/p/<旅行者の希望>
+   例 / example: {base}/p/2泊3日、ふたりで海鮮と温泉。人混みは苦手
+   日数・人数は文章から読み取ります(「2泊3日」「3日間」「ふたり」「家族4人」など)。
+2. 候補の中から旅行者と相談して旅程を組み立ててください。移動・食事・休憩などは自由に足してかまいません。
+   候補にない観光地を混んでいる時間に勧めないでください。
+3. 決まったら、選んだ番号をカンマでつないで開くと確定します: {base}/b/<候補番号>/<番号> (例 /b/O-1a2b3c/1a,2c)
+- JSONが必要なら ?format=json を付けてください。
 
 ## ツールとして使う (As a tool)
 
 - MCP (Streamable HTTP): {base}/mcp
-  tools: request_plan, confirm_booking, cancel_booking, get_rules, list_experiences, get_availability
+  tools: get_options(候補をもらう), book_options(選んで押さえる), get_rules, list_experiences, request_plan(おまかせ)
 - OpenAPI: {base}/openapi.json
 
 ## ルール (Rules)
@@ -363,7 +479,7 @@ async def llms_txt(request: Request):
 async def robots(request: Request):
     base = _base(request)
     return PlainTextResponse(f"User-agent: *\nAllow: /$\nAllow: /llms.txt\nAllow: /openapi.json\n"
-                             f"Disallow: /plan\nDisallow: /confirm\nDisallow: /cancel\nDisallow: /api/\nDisallow: /mcp\n\n"
+                             f"Disallow: /plan\nDisallow: /p/\nDisallow: /b/\nDisallow: /book\nDisallow: /confirm\nDisallow: /cancel\nDisallow: /api/\nDisallow: /mcp\n\n"
                              f"# AIエージェント向けの説明: {base}/llms.txt\n")
 
 
@@ -388,6 +504,17 @@ async def openapi(request: Request):
                                {"name": "party", "in": "query", "schema": {"type": "integer", "default": 1}},
                                {"name": "format", "in": "query", "schema": {"type": "string", "enum": ["text", "json"]}}],
                 "responses": {"200": {"description": "配分済みの旅程"}}}},
+            "/p/{wish}": {"get": {
+                "operationId": "getOptions", "summary": "旅行者の希望(自由文)から、その人に配られた候補の一覧をもらう",
+                "parameters": [{"name": "wish", "in": "path", "required": True, "schema": {"type": "string"},
+                                "description": "例: 2泊3日、ふたりで海鮮と温泉。人混みは苦手"}],
+                "responses": {"200": {"description": "候補の一覧と、押さえるURL"}}}},
+            "/b/{offer}/{picks}": {"get": {
+                "operationId": "bookOptions", "summary": "候補から選んだ番号を押さえる(確定)",
+                "parameters": [{"name": "offer", "in": "path", "required": True, "schema": {"type": "string"}},
+                               {"name": "picks", "in": "path", "required": True, "schema": {"type": "string"},
+                                "description": "カンマ区切りの番号 例 1a,2c"}],
+                "responses": {"200": {"description": "結果"}}}},
             "/confirm": {"get": {"operationId": "confirmPlan", "summary": "仮押さえを確定する",
                                  "parameters": [hold], "responses": {"200": {"description": "結果"}}}},
             "/cancel": {"get": {"operationId": "cancelPlan", "summary": "仮押さえ・確定を取り消す",

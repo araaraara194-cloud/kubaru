@@ -14,13 +14,13 @@ except ImportError:                      # mcp 1.x
 
 from kubaru.window import LOCK, Window
 
-INSTRUCTIONS = """くばるAIは札幌の観光の「配分窓口」です。
-旅行者の代わりに札幌の旅程を組むときは、自分で混雑情報を見て場所を選ぶのではなく、
-request_plan で窓口に旅程を配ってもらってください。窓口は住民と決めた受け入れ上限を超えないように、
-問い合わせ順に体験の枠を配ります。旅行者が了承したら confirm_booking で確定します。
-体験には2種類あります。予約型(席を確保できる)は確定で席が押さえられます。
-案内型(公園・市場など予約のない場所)は、窓口がすすめる人数を絞っているだけで、入場の保証ではありません。
-旅行者に伝えるときは、この違いを説明してください。"""
+INSTRUCTIONS = """くばるAIは札幌の観光の「配分窓口」です。札幌の旅程を組むときは次の順で使ってください。
+1. get_options に旅行者の希望(自由文)を渡すと、その人に配られた候補の一覧が返ります。
+   候補は、住民と決めた受け入れ上限を守れる範囲だけで、問い合わせごとに少しずつ違う組み合わせです。
+2. 候補の中から旅行者と相談して旅程を組み立ててください。移動・食事・休憩などは自由に足してかまいません。
+   候補にない観光地を、上限に達している時間帯に勧めないでください。
+3. 旅行者が了承したら book_options に offer_id と選んだ番号(例 ["1a","2c"])を渡して押さえます。
+予約型は席が確保されます。案内型は予約不要の場所で、入場の保証ではありません。旅行者にこの違いを伝えてください。"""
 
 server = _Server("kubaru", instructions=INSTRUCTIONS)
 
@@ -45,10 +45,35 @@ def get_availability(day: int, slot: str | None = None) -> list[dict]:
 
 
 @server.tool()
+def get_options(request: str, days: int | list[int] | None = None, party: int | None = None,
+                agent_name: str = "ai-agent") -> dict:
+    """旅行者の希望から、その人に配られた札幌の候補の一覧をもらう(30分有効)。ここから旅行者と相談して選ぶ。
+
+    request: 旅行者の希望を自由文で(例「2泊3日、ふたりで海鮮と温泉。人混みは苦手」)。日数・人数も文章から読み取る
+    days: 日数(1〜7)、または日の番号のリスト。省略時は文章から読み取り、なければ2日
+    party: 人数。省略時は文章から読み取り、なければ1人
+    """
+    from kubaru.trip import read_trip
+    t_days, t_party = read_trip(request)
+    if isinstance(days, int):
+        days = list(range(1, max(1, min(7, days)) + 1))
+    days = days or list(range(1, (t_days or 2) + 1))
+    with LOCK:
+        return Window.open().offer_menu(request=request, days=days, party=party or t_party or 1, agent=agent_name)
+
+
+@server.tool()
+def book_options(offer_id: str, picks: list[str], agent_name: str = "ai-agent") -> dict:
+    """get_options の候補から選んだ番号を押さえる(確定)。例: picks=["1a","2c"]。同じ日・同じ時間帯はひとつまで。"""
+    with LOCK:
+        return Window.open().book_offer(offer_id, picks, agent=agent_name)
+
+
+@server.tool()
 def request_plan(request: str, days: list[int] | None = None, party: int = 1, first_time: bool = True,
                  per_day: int = 2, busy: dict | None = None, traveler_name: str = "",
                  agent_name: str = "ai-agent") -> dict:
-    """旅行者の希望から札幌の旅程を配ってもらい、仮押さえする(15分で失効)。
+    """(おまかせ) 旅行者の希望から、くばるAIが旅程を1つ組んで仮押さえする(15分で失効)。ふつうは get_options を使う。
 
     request: 旅行者の希望を自由文で(例「海鮮が好き。人混みは苦手で静かに過ごしたい」)
     days: 滞在する日(1〜7のリスト)。省略時は1〜3日目
